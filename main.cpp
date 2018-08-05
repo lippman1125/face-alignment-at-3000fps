@@ -173,6 +173,185 @@ void Train(const char* config_file_path){
 	std::cout << "save the model successfully\n" << std::endl;
 }
 
+void test_load_text_save_bin(const char* config_file_path){
+	cout << "parsing config_file: " << config_file_path << endl;
+
+    ifstream fin;
+    fin.open(config_file_path, ifstream::in);
+	std::string model_name;
+    fin >> model_name;
+    cout << "model name is: " << model_name << endl;
+	cout << "parsing config file done\n" << endl;
+
+	CascadeRegressor cas_load;
+	cas_load.LoadCascadeRegressor(model_name);
+	cout << "load model done\n" << endl;
+
+	std::cout << "save binary model..." << std::endl;
+	cas_load.SaveCascadeRegressorBinary(model_name);
+	std::cout << "save binary model done\n" << std::endl;
+
+}
+
+void test_load_text_save_onebin(const char* config_file_path){
+	cout << "parsing config_file: " << config_file_path << endl;
+
+    ifstream fin;
+    fin.open(config_file_path, ifstream::in);
+	std::string model_name;
+    fin >> model_name;
+    cout << "model name is: " << model_name << endl;
+	cout << "parsing config file done\n" << endl;
+
+	CascadeRegressor cas_load;
+	cas_load.LoadCascadeRegressor(model_name);
+	cout << "load model done\n" << endl;
+
+	std::cout << "save one binary model..." << std::endl;
+	ofstream fout;
+    fout.open((model_name + ".bin").c_str(), std::fstream::out | std::ios::binary);
+	cas_load.SaveCascadeRegressorOneBinary(fout);
+	fout.close();
+	std::cout << "save one binary model done\n" << std::endl;
+
+}
+
+
+void test_load_bin(const char* config_file_path){
+	cout << "parsing config_file: " << config_file_path << endl;
+
+    ifstream fin;
+    fin.open(config_file_path, ifstream::in);
+	std::string model_name;
+    fin >> model_name;
+    cout << "model name is: " << model_name << endl;
+	bool images_has_ground_truth = false;
+	fin >> images_has_ground_truth;
+	if (images_has_ground_truth) {
+		cout << "the image lists must have ground_truth_shapes!\n" << endl;
+	}
+	else{
+		cout << "the image lists does not have ground_truth_shapes!!!\n" << endl;
+	}
+
+	int path_num;
+    fin >> path_num;
+    cout << "reading testing images paths: " << endl;
+	std::vector<std::string> image_path_prefixes;
+    std::vector<std::string> image_lists;
+    for (int i = 0; i < path_num; i++) {
+        string s;
+        fin >> s;
+        cout << s << endl;
+        image_path_prefixes.push_back(s);
+        fin >> s;
+        cout << s << endl;
+        image_lists.push_back(s);
+    }
+
+	cout << "parsing config file done\n" << endl;
+	CascadeRegressor cas_load;
+	cas_load.LoadCascadeRegressorBinary(model_name);
+	cout << "load model done\n" << endl;
+	std::vector<cv::Mat_<uchar> > images;
+	std::vector<cv::Mat_<double> > ground_truth_shapes;
+	std::vector<BoundingBox> bboxes;
+
+	std::cout << "\nLoading test dataset..." << std::endl;
+	if (images_has_ground_truth) {
+		LoadImages(images, ground_truth_shapes, bboxes, image_path_prefixes, image_lists);
+		double error = 0.0;
+		for (int i = 0; i < images.size(); i++){
+			cv::Mat_<double> current_shape = ReProjection(cas_load.params_.mean_shape_, bboxes[i]);
+	        cv::Mat_<double> res = cas_load.Predict(images[i], current_shape, bboxes[i]);//, ground_truth_shapes[i]);
+			double e = CalculateError(ground_truth_shapes[i], res);
+			// std::cout << "error:" << e << std::endl;
+			error += e;
+	        // DrawPredictedImage(images[i], res);
+		}
+		std::cout << "error: " << error << ", mean error: " << error/images.size() << std::endl;
+	}
+	else{
+		LoadImages(images, bboxes, image_path_prefixes, image_lists);
+		for (int i = 0; i < images.size(); i++){
+			cv::Mat_<double> current_shape = ReProjection(cas_load.params_.mean_shape_, bboxes[i]);
+	        cv::Mat_<double> res = cas_load.Predict(images[i], current_shape, bboxes[i]);//, ground_truth_shapes[i]);
+	        DrawPredictedImage(images[i], res);
+		}
+	}
+}
+
+void test_load_onebin(const char* config_file_path){
+	cout << "parsing config_file: " << config_file_path << endl;
+
+    ifstream fin;
+    fin.open(config_file_path, ifstream::in);
+	std::string model_name;
+    fin >> model_name;
+    cout << "model name is: " << model_name << endl;
+	bool images_has_ground_truth = false;
+	fin >> images_has_ground_truth;
+	if (images_has_ground_truth) {
+		cout << "the image lists must have ground_truth_shapes!\n" << endl;
+	}
+	else{
+		cout << "the image lists does not have ground_truth_shapes!!!\n" << endl;
+	}
+
+	int path_num;
+    fin >> path_num;
+    cout << "reading testing images paths: " << endl;
+	std::vector<std::string> image_path_prefixes;
+    std::vector<std::string> image_lists;
+    for (int i = 0; i < path_num; i++) {
+        string s;
+        fin >> s;
+        cout << s << endl;
+        image_path_prefixes.push_back(s);
+        fin >> s;
+        cout << s << endl;
+        image_lists.push_back(s);
+    }
+	fin.close();
+
+	cout << "parsing config file done\n" << endl;
+	CascadeRegressor cas_load;
+	fin.open((model_name + ".bin").c_str(), std::ifstream::in | std::ios::binary);
+	cas_load.LoadCascadeRegressorOneBinary(fin);
+	fin.close();
+	cout << "load model done\n" << endl;
+
+
+	std::vector<cv::Mat_<uchar> > images;
+	std::vector<cv::Mat_<double> > ground_truth_shapes;
+	std::vector<BoundingBox> bboxes;
+
+	std::cout << "\nLoading test dataset..." << std::endl;
+	if (images_has_ground_truth) {
+		LoadImages(images, ground_truth_shapes, bboxes, image_path_prefixes, image_lists);
+		double error = 0.0;
+		for (int i = 0; i < images.size(); i++){
+			cv::Mat_<double> current_shape = ReProjection(cas_load.params_.mean_shape_, bboxes[i]);
+	        cv::Mat_<double> res = cas_load.Predict(images[i], current_shape, bboxes[i]);//, ground_truth_shapes[i]);
+			double e = CalculateError(ground_truth_shapes[i], res);
+			// std::cout << "error:" << e << std::endl;
+			error += e;
+	        // DrawPredictedImage(images[i], res);
+		}
+		std::cout << "error: " << error << ", mean error: " << error/images.size() << std::endl;
+	}
+	else{
+		LoadImages(images, bboxes, image_path_prefixes, image_lists);
+		for (int i = 0; i < images.size(); i++){
+			cv::Mat_<double> current_shape = ReProjection(cas_load.params_.mean_shape_, bboxes[i]);
+	        cv::Mat_<double> res = cas_load.Predict(images[i], current_shape, bboxes[i]);//, ground_truth_shapes[i]);
+	        DrawPredictedImage(images[i], res);
+		}
+	}
+}
+
+
+
 int main(int argc, char* argv[])
 {
 	std::cout << "\nuse [./application train train_config_file] to train models" << std::endl;
@@ -182,12 +361,26 @@ int main(int argc, char* argv[])
 		if (strcmp(argv[1], "train") == 0)
 		{
 			Train(argv[2]);
-            return 0;
 		}
-		if (strcmp(argv[1], "test") == 0)
+		else if (strcmp(argv[1], "test") == 0)
 		{
 			Test(argv[2]);
-            return 0;
+		}
+		else if (strcmp(argv[1], "test_bsave") == 0)
+		{
+			test_load_text_save_bin(argv[2]);
+		}
+		else if (strcmp(argv[1], "test_bload") == 0)
+		{
+			test_load_bin(argv[2]);
+		}
+		else if (strcmp(argv[1], "test_obsave") == 0)
+		{
+			test_load_text_save_onebin(argv[2]);
+		}
+		else if (strcmp(argv[1], "test_obload") == 0)
+		{
+			test_load_onebin(argv[2]);
 		}
 	}
 	else {

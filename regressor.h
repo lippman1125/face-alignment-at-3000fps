@@ -39,6 +39,12 @@ public:
 		BoundingBox& bbox, cv::Mat_<double>& rotation, double scale);
 	void LoadRegressor(std::string ModelName, int stage);
 	void SaveRegressor(std::string ModelName, int stage);
+    void LoadRegressorBinary(std::string ModelName, int stage);
+	void SaveRegressorBinary(std::string ModelName, int stage);
+    void LoadRegressorOneBinary(std::ifstream &fin, int stage);
+    void SaveRegressorOneBinary(std::ofstream &fout, int stage);
+    void LoadCascadeRegressorOneBinary(std::ifstream &fin);
+    void SaveCascadeRegressorOneBinary(std::ofstream &fout);
     void ConstructLeafCount();
     // struct feature_node* GetGlobalBinaryFeaturesThread(cv::Mat_<uchar>& image, cv::Mat_<double>& current_shape, BoundingBox& bbox, cv::Mat_<double>& rotation, double scale);
     struct feature_node* GetGlobalBinaryFeaturesMP(cv::Mat_<uchar>& image,
@@ -71,6 +77,10 @@ public:
 	cv::Mat_<double> Predict(cv::Mat_<uchar>& image, cv::Mat_<double>& current_shape, BoundingBox& bbox, int stage = -1, bool is_train = false);
 	void LoadCascadeRegressor(std::string ModelName);
 	void SaveCascadeRegressor(std::string ModelName);
+    void LoadCascadeRegressorBinary(std::string ModelName);
+	void SaveCascadeRegressorBinary(std::string ModelName);
+    void LoadCascadeRegressorOneBinary(std::ifstream &fin);
+    void SaveCascadeRegressorOneBinary(std::ofstream &fout);
 	void Validation(int stage);
 };
 

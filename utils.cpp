@@ -329,8 +329,8 @@ void LoadImages(std::vector<cv::Mat_<uchar> >& images,
 			else{
 				image_path = path_prefix + "/" + image_file_name;
 			}
-            cv::Mat_<uchar> image = cv::imread(image_path.c_str(), 0);
 
+            cv::Mat_<uchar> image = cv::imread(image_path.c_str(), 0);
 
             if (image.cols > 2000){
                 cv::resize(image, image, cv::Size(image.cols / 4, image.rows / 4), 0, 0, cv::INTER_LINEAR);
@@ -342,21 +342,24 @@ void LoadImages(std::vector<cv::Mat_<uchar> >& images,
             std::vector<cv::Rect> faces;
             haar_cascade.detectMultiScale(image, faces, 1.1, 2, 0, cv::Size(30, 30));
 
-            cv::Rect faceRec = faces[0]; // this position may not contain a face
-            images.push_back(image);
-            BoundingBox bbox;
-            bbox.start_x = faceRec.x;
-            bbox.start_y = faceRec.y;
-            bbox.width = faceRec.width;
-            bbox.height = faceRec.height;
-            bbox.center_x = bbox.start_x + bbox.width / 2.0;
-            bbox.center_y = bbox.start_y + bbox.height / 2.0;
-            bboxes.push_back(bbox);
-            count++;
-            c++;
-            if (count%100 == 0){
-                std::cout << count << " images loaded\n";
-            }
+			std::cout << image_file_name << " " << faces.size() << std::endl;
+			if (faces.size()) {
+	            cv::Rect faceRec = faces[0]; // this position may not contain a face
+	            images.push_back(image);
+	            BoundingBox bbox;
+	            bbox.start_x = faceRec.x;
+	            bbox.start_y = faceRec.y;
+	            bbox.width = faceRec.width;
+	            bbox.height = faceRec.height;
+	            bbox.center_x = bbox.start_x + bbox.width / 2.0;
+	            bbox.center_y = bbox.start_y + bbox.height / 2.0;
+	            bboxes.push_back(bbox);
+	            count++;
+	            c++;
+	            //if (count%100 == 0){
+	            //    std::cout << count << " images loaded\n";
+	            //}
+			}
         }
         std::cout << "get " << c << " faces in " << path_prefix << std::endl;
         fin.close();
@@ -380,6 +383,7 @@ double CalculateError(cv::Mat_<double>& ground_truth_shape, cv::Mat_<double>& pr
     temp = ground_truth_shape.rowRange(36, 41)-ground_truth_shape.rowRange(42, 47);
     double x =mean(temp.col(0))[0];
     double y = mean(temp.col(1))[0];
+	//calculate distance between two eyes
     double interocular_distance = sqrt(x*x+y*y);
     double sum = 0;
     for (int i=0;i<ground_truth_shape.rows;i++){

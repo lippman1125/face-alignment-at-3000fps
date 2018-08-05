@@ -2,6 +2,43 @@
 #define RANDOMFOREST_H
 #include "utils.h"
 #include <set>
+
+struct forest_bin_serial {
+ double local_radius;
+ int    stage;
+ int    feature_num;
+ int    landmark_index;
+ int    tree_depth;
+ int    trees_num_per_forest;
+ int    all_leaf_nodes;
+ int    tree_size;
+ int    reserved;
+};
+/*
+struct node_bin_serial {
+    double threshold;
+    double local_start_x;
+    double local_start_y;
+    double local_end_x;
+    double local_end_y;
+    int    is_leaf;
+    int    leaf_id;
+    int    depth;
+    int    reserved;
+};
+*/
+struct node_bin_serial {
+    float threshold;
+    float local_start_x;
+    float local_start_y;
+    float local_end_x;
+    float local_end_y;
+    short   leaf_id;
+    char    is_leaf;
+    char    depth;
+};
+
+
 class Node {
 public:
 	int leaf_identity; // used only when it is leaf node, and is unique among the tree
@@ -56,8 +93,14 @@ public:
 	RandomForest(Parameters& param, int landmark_index, int stage, std::vector<cv::Mat_<double> >& regression_targets);
 	void WriteTree(Node* p, std::ofstream& fout);
 	Node* ReadTree(std::ifstream& fin);
+    int CountTreeNode(Node* p);
 	void SaveRandomForest(std::ofstream& fout);
 	void LoadRandomForest(std::ifstream& fin);
+
+    void WriteTreeBinary(Node* p, std::ofstream& fout);
+	Node* ReadTreeBinary(std::ifstream& fin);
+	void SaveRandomForestBinary(std::ofstream& fout);
+	void LoadRandomForestBinary(std::ifstream& fin);
 };
 
 #endif

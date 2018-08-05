@@ -65,7 +65,7 @@ bool RandomForest::TrainForest(//std::vector<cv::Mat_<double>>& regression_targe
 		cv::Mat_<double> rotation = rotations[i];
 		double scale = scales[i];
 		//getSimilarityTransform(ProjectShape(augmented_current_shapes[i], augmented_bboxes[i]),mean_shape_, rotation, scale);
-
+		//cv::Mat_<uchar> image_dots = images[augmented_images_index[i]].clone();
 		for (int j = 0; j < local_features_num_; j++){
 			FeatureLocations pos = local_position_[j];
 			double delta_x = rotation(0, 0)*pos.start.x + rotation(0, 1)*pos.start.y;
@@ -78,6 +78,9 @@ bool RandomForest::TrainForest(//std::vector<cv::Mat_<double>>& regression_targe
 			real_y = std::max(0, std::min(real_y, images[augmented_images_index[i]].rows - 1)); // which rows
 			int tmp = (int)images[augmented_images_index[i]](real_y, real_x); //real_y at first
 
+    		//cv::circle(images[augmented_images_index[i]], cv::Point2f(real_x - delta_x, real_y - delta_y), 1, (255));
+			//cv::circle(image_dots, cv::Point2f(real_x, real_y), 1, (255));
+
 			delta_x = rotation(0, 0)*pos.end.x + rotation(0, 1)*pos.end.y;
 			delta_y = rotation(1, 0)*pos.end.x + rotation(1, 1)*pos.end.y;
 			delta_x = scale*delta_x*augmented_bboxes[i].width / 2.0;
@@ -88,6 +91,12 @@ bool RandomForest::TrainForest(//std::vector<cv::Mat_<double>>& regression_targe
 			real_y = std::max(0, std::min(real_y, images[augmented_images_index[i]].rows - 1)); // which rows
 			pixel_differences(j, i) = tmp - (int)images[augmented_images_index[i]](real_y, real_x);
 		}
+
+		// show random dots around initial landmark
+		//cv::imshow("show image landmarks", images[augmented_images_index[i]]);
+		//cv::imshow("show image random dots", image_dots);
+		//cv::waitKey(0);
+		//image_dots.release();
 	}
 	// train Random Forest
 	// construct each tree in the forest
@@ -110,6 +119,7 @@ bool RandomForest::TrainForest(//std::vector<cv::Mat_<double>>& regression_targe
 		//cv::sortIdx(data, sorted_data, cv::SORT_EVERY_ROW + cv::SORT_ASCENDING);
 		std::set<int> selected_indexes;
 		std::vector<int> images_indexes;
+		//std::cout << start_index <<":"<<end_index <<std::endl;
 		for (int j = start_index; j < end_index; j++){
 			images_indexes.push_back(j);
 		}
@@ -437,6 +447,21 @@ Node* RandomForest::ReadTree(std::ifstream& fin){
 	}
 }
 
+int RandomForest::CountTreeNode(Node* p) {
+	int count = 0;
+
+	if (p != NULL) {
+		count = 1;
+	} else {
+		return 0;
+	}
+
+	count += CountTreeNode(p->left_child_);
+	count += CountTreeNode(p->right_child_);
+
+	return count;
+}
+
 void RandomForest::LoadRandomForest(std::ifstream& fin){
 
 	int tree_size;
@@ -455,3 +480,147 @@ void RandomForest::LoadRandomForest(std::ifstream& fin){
 		trees_.push_back(root);
 	}
 }
+
+void RandomForest::SaveRandomForestBinary(std::ofstream& fout){
+	int cnt = 0;
+	struct forest_bin_serial forest_bin;
+
+	forest_bin.stage = stage_;
+	forest_bin.feature_num = local_features_num_;
+	forest_bin.landmark_index = landmark_index_;
+	forest_bin.tree_depth = tree_depth_;
+	forest_bin.trees_num_per_forest = trees_num_per_forest_;
+	forest_bin.local_radius = local_radius_;
+	forest_bin.all_leaf_nodes = all_leaf_nodes_;
+	forest_bin.tree_size = trees_.size();
+
+	fout.write((char*)&forest_bin, sizeof(forest_bin));
+	/*
+	fout << stage_ << " "
+		<< local_features_num_ << " "
+		<< landmark_index_ << " "
+		<< tree_depth_ << " "
+		<< trees_num_per_forest_ << " "
+		<< local_radius_ << " "
+		<< all_leaf_nodes_ << " "
+		<< trees_.size() << std::endl;
+	*/
+	for (int i = 0; i < trees_.size(); i++){
+		Node* root = trees_[i];
+		cnt = CountTreeNode(root);
+		std::cout<< "No." << i << " tree nodes = "<< cnt << std::endl;
+		//fout.write((char*)&cnt, sizeof(cnt));
+		WriteTreeBinary(root, fout);
+	}
+}
+
+void RandomForest::WriteTreeBinary(Node* p, std::ofstream& fout){
+	/*
+	if (!p){
+		fout << "#" << std::endl;
+	}
+	else{
+		fout <<"Y" << " "
+			<< p->threshold_ << " "
+			<< p->is_leaf_ << " "
+			<< p->leaf_identity << " "
+			<< p->depth_ << " "
+			<< p->feature_locations_.start.x << " "
+			<< p->feature_locations_.start.y << " "
+			<< p->feature_locations_.end.x << " "
+			<< p->feature_locations_.end.y << std::endl;
+		WriteTree(p->left_child_, fout);
+		WriteTree(p->right_child_, fout);
+	}
+	*/
+	struct node_bin_serial node_bin;
+
+	if (!p) {
+		return;
+	} else {
+		node_bin.threshold = (float)p->threshold_;
+		node_bin.is_leaf = (char)p->is_leaf_;
+		node_bin.leaf_id = (short)p->leaf_identity;
+		node_bin.depth = (char)p->depth_;
+		node_bin.local_start_x = (float)p->feature_locations_.start.x;
+		node_bin.local_start_y = (float)p->feature_locations_.start.y;
+		node_bin.local_end_x = (float)p->feature_locations_.end.x;
+		node_bin.local_end_y = (float)p->feature_locations_.end.y;
+
+		fout.write((char*)&node_bin, sizeof(node_bin));
+
+		WriteTreeBinary(p->left_child_, fout);
+		WriteTreeBinary(p->right_child_, fout);
+	}
+}
+
+Node* RandomForest::ReadTreeBinary(std::ifstream& fin){
+	struct node_bin_serial node_bin;
+
+	fin.read((char*)&node_bin, sizeof(node_bin));
+	Node* p = new Node();
+	p->threshold_ = node_bin.threshold;
+	p->is_leaf_ = node_bin.is_leaf;
+	p->leaf_identity = node_bin.leaf_id;
+	p->depth_ = node_bin.depth;
+	p->feature_locations_.start.x = node_bin.local_start_x;
+	p->feature_locations_.start.y = node_bin.local_start_y;
+	p->feature_locations_.end.x = node_bin.local_end_x;
+	p->feature_locations_.end.y = node_bin.local_end_y;
+	if (p->is_leaf_ == 0) {
+		p->left_child_ = ReadTreeBinary(fin);
+		p->right_child_ = ReadTreeBinary(fin);
+	} else {
+		p->left_child_ = NULL;
+		p->right_child_ = NULL;
+	}
+
+	return p;
+
+}
+
+void RandomForest::LoadRandomForestBinary(std::ifstream& fin){
+	int cnt;
+	int tree_size;
+	struct forest_bin_serial forest_bin;
+	/*
+	fin >> stage_
+		>> local_features_num_
+		>> landmark_index_
+		>> tree_depth_
+		>> trees_num_per_forest_
+		>> local_radius_
+		>> all_leaf_nodes_
+		>> tree_size;
+	*/
+	fin.read((char*)&forest_bin, sizeof(forest_bin));
+
+	stage_ = forest_bin.stage;
+	local_features_num_ = forest_bin.feature_num;
+	landmark_index_ = forest_bin.landmark_index;
+	tree_depth_ = forest_bin.tree_depth;
+	trees_num_per_forest_ = forest_bin.trees_num_per_forest;
+	local_radius_ = forest_bin.local_radius;
+	all_leaf_nodes_ = forest_bin.all_leaf_nodes;
+	tree_size = forest_bin.tree_size;
+
+	/*
+	std::cout << "stage_ = " << stage_ << std::endl;
+	std::cout << "local_features_num_ = " << local_features_num_ << std::endl;
+	std::cout << "landmark_index_ = " << landmark_index_ << std::endl;
+	std::cout << "tree_depth_ = " << tree_depth_ << std::endl;
+	std::cout << "trees_num_per_forest_ = " << trees_num_per_forest_ << std::endl;
+	std::cout << "local_radius_ = " << local_radius_ << std::endl;
+	std::cout << "all_leaf_nodes_ = " << all_leaf_nodes_ << std::endl;
+	std::cout << "tree_size = " << tree_size << std::endl;
+	*/
+
+	std::string start_flag;
+	trees_.clear();
+	for (int i = 0; i < tree_size; i++){
+		//fin.read((char*)&cnt, sizeof(cnt));
+		Node* root = ReadTreeBinary(fin);
+		trees_.push_back(root);
+	}
+}
+
