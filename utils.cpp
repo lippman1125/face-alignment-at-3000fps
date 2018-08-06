@@ -113,6 +113,33 @@ cv::Mat_<double> LoadGroundTruthShape(const char* name){
 	return shape;
 }
 
+cv::Mat_<double> LoadGroundTruthShapeFrom68(const char* name, std::vector<int>& landmark_idxs){
+	int landmarks = 0;
+    double temp_x;
+    double temp_y;
+	std::ifstream fin;
+	std::string temp;
+	fin.open(name, std::fstream::in);
+	getline(fin, temp);// read first line
+	fin >> temp >> landmarks;
+	cv::Mat_<double> shape(landmark_idxs.size(), 2);
+	getline(fin, temp); // read '\n' of the second line
+	getline(fin, temp); // read third line
+	for (int i = 0, j = 0; i<landmarks; i++){
+        if (i == landmark_idxs[j] - 1) {
+		    fin >> shape(j, 0) >> shape(j, 1);
+            //std::cout << j <<" "<< landmark_idxs[j] << std::endl;
+            j++;
+        } else {
+            fin >> temp_x >> temp_y;
+        }
+
+	}
+	fin.close();
+	return shape;
+}
+
+
 bool ShapeInRect(cv::Mat_<double>& shape, cv::Rect& ret){
 	double sum_x = 0.0, sum_y = 0.0;
 	double max_x = 0, min_x = 10000, max_y = 0, min_y = 10000;
@@ -303,6 +330,85 @@ void LoadImages(std::vector<cv::Mat_<uchar> >& images,
 }
 
 void LoadImages(std::vector<cv::Mat_<uchar> >& images,
+                std::vector<cv::Mat_<double> >& ground_truth_shapes,
+                std::vector<BoundingBox>& bboxes,
+                std::vector<std::string>& image_path_prefix,
+                std::vector<std::string>& image_lists,
+                std::vector<int>& landmark_idxs){
+
+    std::string fn_haar = "./../haarcascade_frontalface_alt2.xml";
+    cv::CascadeClassifier haar_cascade;
+    bool yes = haar_cascade.load(fn_haar);
+    std::cout << "face detector loaded : " << yes << std::endl;
+    std::cout << "loading images..." << std::endl;
+
+    int count = 0;
+    for (int i = 0; i < image_path_prefix.size(); i++) {
+        int c = 0;
+        std::ifstream fin;
+        fin.open((image_lists[i]).c_str(), std::ifstream::in);
+        std::string path_prefix = image_path_prefix[i];
+        std::string image_file_name, image_pts_name;
+        std::cout << "loading images in folder: " << path_prefix << std::endl;
+        while (fin >> image_file_name >> image_pts_name){
+			std::string image_path, pts_path;
+			if (path_prefix[path_prefix.size()-1] == '/') {
+				image_path = path_prefix + image_file_name;
+				pts_path = path_prefix + image_pts_name;
+			}
+			else{
+				image_path = path_prefix + "/" + image_file_name;
+				pts_path = path_prefix + "/" + image_pts_name;
+			}
+            cv::Mat_<uchar> image = cv::imread(image_path.c_str(), 0);
+            // std::cout << "image size: " << image.size() << std::endl;
+            cv::Mat_<double> ground_truth_shape = LoadGroundTruthShapeFrom68(pts_path.c_str(), landmark_idxs);
+
+            if (image.cols > 2000){
+                cv::resize(image, image, cv::Size(image.cols / 4, image.rows / 4), 0, 0, cv::INTER_LINEAR);
+                ground_truth_shape /= 4.0;
+            }
+            else if (image.cols > 1400 && image.cols <= 2000){
+                cv::resize(image, image, cv::Size(image.cols / 3, image.rows / 3), 0, 0, cv::INTER_LINEAR);
+                ground_truth_shape /= 3.0;
+            }
+
+            std::vector<cv::Rect> faces;
+            haar_cascade.detectMultiScale(image, faces, 1.1, 2, 0, cv::Size(30, 30));
+
+             for (int i = 0; i < faces.size(); i++){
+                cv::Rect faceRec = faces[i];
+                if (ShapeInRect(ground_truth_shape, faceRec)){
+                    images.push_back(image);
+                    ground_truth_shapes.push_back(ground_truth_shape);
+                    BoundingBox bbox;
+
+                    bbox.start_x = faceRec.x;
+                    bbox.start_y = faceRec.y;
+                    bbox.width = faceRec.width;
+                    bbox.height = faceRec.height;
+                    bbox.center_x = bbox.start_x + bbox.width / 2.0;
+                    bbox.center_y = bbox.start_y + bbox.height / 2.0;
+                    bboxes.push_back(bbox);
+                    count++;
+                    c++;
+                    if (count%100 == 0){
+                        std::cout << count << " images loaded\n";
+                    }
+                    break;
+                }
+             }
+        }
+        std::cout << "get " << c << " faces in " << path_prefix << std::endl;
+        fin.close();
+    }
+
+    std::cout << "get " << bboxes.size() << " faces in total" << std::endl;
+
+}
+
+
+void LoadImages(std::vector<cv::Mat_<uchar> >& images,
                 std::vector<BoundingBox>& bboxes,
                 std::vector<std::string>& image_path_prefix,
                 std::vector<std::string>& image_lists){
@@ -380,7 +486,11 @@ void LoadImages(std::vector<cv::Mat_<uchar> >& images,
 
 double CalculateError(cv::Mat_<double>& ground_truth_shape, cv::Mat_<double>& predicted_shape){
     cv::Mat_<double> temp;
-    temp = ground_truth_shape.rowRange(36, 41)-ground_truth_shape.rowRange(42, 47);
+    if (ground_truth_shape.rows < 68) {
+        temp = ground_truth_shape.rowRange(3, 4)-ground_truth_shape.rowRange(5, 6);
+    } else {
+        temp = ground_truth_shape.rowRange(36, 41)-ground_truth_shape.rowRange(42, 47);
+    }
     double x =mean(temp.col(0))[0];
     double y = mean(temp.col(1))[0];
 	//calculate distance between two eyes

@@ -95,12 +95,18 @@ void getSimilarityTransform(const cv::Mat_<double>& shape_to,
 
 //cv::Mat_<double> LoadGroundTruthShape(std::string& name);
 cv::Mat_<double> LoadGroundTruthShape(const char* name);
+cv::Mat_<double> LoadGroundTruthShapeFrom68(const char* name, std::vector<int>& landmark_idxs);
+
 
 void LoadImages(std::vector<cv::Mat_<uchar> >& images, std::vector<cv::Mat_<double> >& ground_truth_shapes,
 	std::vector<BoundingBox>& bboxes, std::string file_names);
 
 void LoadImages(std::vector<cv::Mat_<uchar> >& images, std::vector<cv::Mat_<double> >& ground_truth_shapes,
 	std::vector<BoundingBox>& bboxes, std::vector<std::string>& image_path_prefix, std::vector<std::string>& image_lists);
+
+void LoadImages(std::vector<cv::Mat_<uchar> >& images, std::vector<cv::Mat_<double> >& ground_truth_shapes,
+    std::vector<BoundingBox>& bboxes, std::vector<std::string>& image_path_prefix, std::vector<std::string>& image_lists, std::vector<int>& landmark_idxs);
+
 
 void LoadImages(std::vector<cv::Mat_<uchar> >& images, std::vector<BoundingBox>& bboxes,
 	std::vector<std::string>& image_path_prefix, std::vector<std::string>& image_lists);
